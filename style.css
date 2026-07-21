@@ -1,0 +1,295 @@
+/* ---------------------------------------------------------------------------
+   Colour — a phone drawing toy for small hands.
+   Everything is oversized, high-contrast, and impossible to break by tapping.
+--------------------------------------------------------------------------- */
+
+:root {
+  --paper: #ffffff;
+  --bg: #fafafa;
+  --panel: rgba(255, 255, 255, 0.92);
+  --menu-text: #333333;
+  --track: #e2e2e2;
+  --thumb-face: #ffffff;
+  --thumb-ring: #bbbbbb;
+  --ring: rgba(0, 0, 0, 0.14);
+  --active-ring: rgba(0, 0, 0, 0.55);
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.16);
+  --danger: #e5342b;
+  --eraser-stroke: #555555;
+}
+
+body.dark {
+  --paper: #16181c;
+  --bg: #0e0f11;
+  --panel: rgba(34, 37, 42, 0.92);
+  --menu-text: #ececec;
+  --track: #3a3d43;
+  --thumb-face: #ececec;
+  --thumb-ring: #6a6e75;
+  --ring: rgba(255, 255, 255, 0.22);
+  --active-ring: rgba(255, 255, 255, 0.85);
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  --danger: #ff6b61;
+  --eraser-stroke: #cfd2d6;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  /* Kill every native touch gesture: scroll, pinch-zoom, double-tap-zoom. */
+  touch-action: none;
+  overscroll-behavior: none;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  transition: background 0.2s ease;
+}
+
+#board {
+  position: fixed;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--paper);
+  touch-action: none;
+  transition: background 0.2s ease;
+}
+
+/* --- Settings (top-left gear + menu) ------------------------------------ */
+
+.settings {
+  position: fixed;
+  top: calc(env(safe-area-inset-top, 0px) + 16px);
+  left: calc(env(safe-area-inset-left, 0px) + 16px);
+  z-index: 10;
+}
+
+.icon-btn {
+  width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: 50%;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: transform 0.12s ease;
+}
+
+.icon-btn:active {
+  transform: scale(0.92);
+}
+
+.icon-btn svg {
+  width: 26px;
+  height: 26px;
+  fill: var(--menu-text);
+}
+
+.settings-menu {
+  position: absolute;
+  top: 66px;
+  left: 0;
+  min-width: 200px;
+  background: var(--panel);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+.settings-menu[hidden] {
+  display: none;
+}
+
+.menu-item {
+  border: none;
+  background: transparent;
+  border-radius: 12px;
+  padding: 16px 18px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--menu-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu-item:active {
+  background: rgba(128, 128, 128, 0.18);
+}
+
+.menu-item--danger {
+  color: var(--danger);
+}
+
+/* --- Toolbar (colours + size) ------------------------------------------ */
+
+/* The toolbar is just a transparent stack that centres the two pills. */
+.toolbar {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 22px);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Shared pill look for the two boxes. */
+.colors,
+.slider {
+  background: var(--panel);
+  border-radius: 40px;
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+
+/* Colours get their own box, sized to their contents. */
+.colors {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 64px;
+  padding: 8px 22px;
+}
+
+/* Unselected swatches are small; the active one grows big and obvious. */
+.swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  background: var(--c, #ccc);
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  transition: width 0.16s ease, height 0.16s ease, border-color 0.16s ease;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.35);
+  flex: 0 0 auto;
+}
+
+.swatch:active {
+  opacity: 0.8;
+}
+
+.swatch.is-active {
+  width: 64px;
+  height: 64px;
+  border-color: var(--active-ring);
+}
+
+.swatch--eraser {
+  background: var(--paper);
+  box-shadow: inset 0 0 0 2px var(--ring);
+  font-size: 18px;
+  line-height: 1;
+  transition: width 0.16s ease, height 0.16s ease, border-color 0.16s ease,
+    font-size 0.16s ease;
+}
+
+.swatch--eraser.is-active {
+  font-size: 34px;
+}
+
+/* Pen-size slider — full width. A wedge behind the track fattens to the right
+   so the shape itself says "bigger this way", and the thumb grows with the
+   chosen size (driven by --thumb from JS). */
+/* Slider gets its own box; the track inside is a fixed, compact width
+   (padding leaves room for the knob to reach the rims without clipping). */
+.slider {
+  display: flex;
+  align-items: center;
+  padding: 12px 42px;
+}
+
+.track {
+  position: relative;
+  width: 180px;
+  height: 48px;
+}
+
+.slider-wedge {
+  position: absolute;
+  inset: 0;
+  margin: auto 0;
+  height: 48px;
+  background: var(--track);
+  clip-path: polygon(0% 44%, 100% 0%, 100% 100%, 0% 56%);
+  pointer-events: none;
+}
+
+/* The visible knob. Its left is a % set from JS and it is centred on that
+   point, so at min/max the centre sits right on the track's outer rim. */
+.slider-knob {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: var(--thumb, 24px);
+  height: var(--thumb, 24px);
+  border-radius: 50%;
+  background: var(--thumb-face);
+  border: 3px solid var(--thumb-ring);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.size {
+  -webkit-appearance: none;
+  appearance: none;
+  position: relative;
+  width: 100%;
+  height: 48px;
+  background: transparent;
+  outline: none;
+  cursor: pointer;
+}
+
+.size::-webkit-slider-runnable-track {
+  height: 48px;
+  background: transparent;
+}
+
+/* Native thumb is a thin, invisible strip: 1px wide keeps the value mapping
+   linear across the full track (so the knob centre tracks the rim exactly);
+   tall for an easy grab. */
+.size::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 1px;
+  height: 48px;
+  background: transparent;
+  border: none;
+}
+
+.size::-moz-range-track {
+  height: 48px;
+  background: transparent;
+}
+
+.size::-moz-range-thumb {
+  width: 1px;
+  height: 48px;
+  background: transparent;
+  border: none;
+}
