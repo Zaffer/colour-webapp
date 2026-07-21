@@ -47,23 +47,21 @@
       <button class="swatch swatch--eraser" data-eraser role="radio" aria-checked="false" aria-label="Eraser">🧹</button>
     </div>
     <div class="slider">
-      <div class="track">
-        <!-- Wedge grows to the right to show the pen gets bigger that way. -->
-        <div class="slider-wedge" aria-hidden="true"></div>
-        <!-- Our own knob: positioned so its CENTRE reaches the rims. The native
-             range thumb below is invisible and only drives interaction. -->
-        <div class="slider-knob" aria-hidden="true"></div>
-        <input
-          id="size"
-          class="size"
-          type="range"
-          min="4"
-          max="80"
-          value="24"
-          step="1"
-          aria-label="Pen size"
-        />
-      </div>
+      <!-- Wedge grows to the right to show the pen gets bigger that way. -->
+      <div class="slider-wedge" aria-hidden="true"></div>
+      <!-- Our own knob: positioned so its CENTRE reaches the rims. The native
+           range thumb below is invisible and only drives interaction. -->
+      <div class="slider-knob" aria-hidden="true"></div>
+      <input
+        id="size"
+        class="size"
+        type="range"
+        min="4"
+        max="80"
+        value="24"
+        step="1"
+        aria-label="Pen size"
+      />
     </div>
   </div>
 
