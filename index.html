@@ -12,7 +12,7 @@
   <title>Colour</title>
   <link
     rel="icon"
-    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='11' cy='12' r='6' fill='%23e5342b'/%3E%3Ccircle cx='21' cy='12' r='6' fill='%232ca24a'/%3E%3Ccircle cx='16' cy='21' r='6' fill='%232b6fe5'/%3E%3C/svg%3E"
+    href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='11' cy='12' r='6' fill='%23e0356b'/%3E%3Ccircle cx='21' cy='12' r='6' fill='%232ca24a'/%3E%3Ccircle cx='16' cy='21' r='6' fill='%232b6fe5'/%3E%3C/svg%3E"
   />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -32,6 +32,8 @@
     </button>
     <div id="settings-menu" class="settings-menu" hidden>
       <button id="btn-dark" class="menu-item">Dark mode</button>
+      <button id="btn-mix" class="menu-item">Mix colours: on</button>
+      <button id="btn-style" class="menu-item">Mix style: colour</button>
       <button id="btn-fullscreen" class="menu-item">Fullscreen</button>
       <button id="btn-save" class="menu-item">Save picture</button>
       <button id="btn-clear" class="menu-item menu-item--danger">Start over</button>
@@ -41,7 +43,11 @@
   <!-- Tools: colours + eraser on top, pen size across the bottom. -->
   <div id="toolbar" class="toolbar">
     <div class="colors" role="radiogroup" aria-label="Colour">
-      <button class="swatch is-active" data-color="#e5342b" style="--c:#e5342b" role="radio" aria-checked="true" aria-label="Red"></button>
+      <!-- The red is a crimson: warm orange-reds mix to mud with blue under
+           pigment mixing, crimson gives a real purple (same reason paint
+           sets include crimson). -->
+      <button class="swatch is-active" data-color="#e0356b" style="--c:#e0356b" role="radio" aria-checked="true" aria-label="Red"></button>
+      <button class="swatch" data-color="#f1c40f" style="--c:#f1c40f" role="radio" aria-checked="false" aria-label="Yellow"></button>
       <button class="swatch" data-color="#2ca24a" style="--c:#2ca24a" role="radio" aria-checked="false" aria-label="Green"></button>
       <button class="swatch" data-color="#2b6fe5" style="--c:#2b6fe5" role="radio" aria-checked="false" aria-label="Blue"></button>
       <button class="swatch swatch--eraser" data-eraser role="radio" aria-checked="false" aria-label="Eraser">🧹</button>
@@ -65,6 +71,10 @@
     </div>
   </div>
 
+  <!-- Pigment mixing: Mixbox preferred, spectral.js as MIT fallback.
+       See THIRD-PARTY-NOTICES.md — deleting mixbox.js makes the app all-MIT. -->
+  <script src="mixbox.js"></script>
+  <script src="spectral.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
