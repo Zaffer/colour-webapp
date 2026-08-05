@@ -108,11 +108,24 @@
   const mixCache = new Map();
 
   // How much pigment a stroke lays down where it covers a pixel fully, out of
-  // 255. Below full means one pass leaves paper showing through and a second
-  // pass builds the colour up, the way a thin wash does. This is the knob a
-  // "paint amount" control would drive; for now every stroke lays the same.
-  const PAINT_AMOUNT = 200;
+  // 255. Below full means one pass leaves paper showing through, the way a thin
+  // wash does. This is the knob a "paint amount" control would drive.
+  const PAINT_AMOUNT = 208;
   const PAINT_SCALE = PAINT_AMOUNT / 255;
+
+  // What each later layer adds. A first pass lands at PAINT_AMOUNT; passes over
+  // existing paint creep up by this much only, so 208 -> 224 -> 240 -> full is
+  // four passes instead of saturating on the second. Opacity only: the pigment
+  // mix still weights by the full amount laid, so two crossing strokes go
+  // half-and-half however faint the paper under them still reads.
+  const LAYER_ADD = 16;
+
+  // Alpha at or below which a pixel counts as bare paper. What reads back from
+  // a rim that faint is mostly premultiplied-alpha noise rather than a colour
+  // (see the pigment table note above), so mixing against it tints the seam.
+  // MIXQ at 64 levels used to round these to zero and skip them for free; at
+  // 256 levels nothing rounds away, so the tolerance has to be explicit.
+  const BARE_ALPHA = 2;
 
   function resetPigments() {
     pigments.clear();
@@ -222,14 +235,15 @@
       // drawing the mask at reduced alpha keeps a stroke even: the mask is
       // built from overlapping dabs, which would each composite again and
       // darken every overlap.
-      const laid = (cov[i + 3] / 255) * PAINT_SCALE;
+      const coverage = cov[i + 3] / 255;
+      const laid = coverage * PAINT_SCALE;
       if (laid === 0) continue;
       const had = px[i + 3] / 255; // paint that was already on the paper
 
       const qLaid = Math.round(laid * MIXQ);
       const qHad = Math.round(had * MIXQ);
 
-      if (qHad === 0) {
+      if (px[i + 3] <= BARE_ALPHA) {
         // Bare paper: the brush colour goes down as-is.
         px[i] = cov[i];
         px[i + 1] = cov[i + 1];
@@ -265,7 +279,21 @@
         px[i + 1] = out[1];
         px[i + 2] = out[2];
       }
-      px[i + 3] = Math.min(255, Math.round((had + laid) * 255));
+      // A pass always lays at least its own paint amount, and only creeps by
+      // LAYER_ADD where that would be going backwards — LAYER_ADD throttles
+      // building up past the paint amount, it must never hold a pixel below it.
+      // Taking the increment alone stranded the faint rim of paint underneath
+      // at rim + 16 while the solid parts either side reached 208 and 224, and
+      // that translucent seam was a white line tracing every buried edge.
+      //
+      // `px` is the frozen session snapshot rather than the live canvas, which
+      // keeps this a pure function of (baseline alpha, coverage): the repeated
+      // flushes a stroke makes while being drawn recompute one value instead of
+      // stacking an increment per frame. Coverage scales both terms so
+      // anti-aliased rims stay soft.
+      const want = laid * 255; // what this pass lays on bare paper
+      const step = px[i + 3] + LAYER_ADD * coverage; // creep past what is there
+      px[i + 3] = Math.min(255, Math.round(Math.max(want, step)));
     }
 
     ctx.putImageData(img, x, y);
