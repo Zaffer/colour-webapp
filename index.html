@@ -42,6 +42,19 @@
 
   <!-- Tools: colours + eraser on top, pen size across the bottom. -->
   <div id="toolbar" class="toolbar">
+    <!-- Grab-bar. Drag it down and the whole panel follows your finger, then
+         snaps below the bottom edge leaving just this handle showing; drag it
+         back up — or tap it — and the panel returns to its usual spot. -->
+    <button
+      id="tb-handle"
+      class="tb-handle"
+      aria-label="Hide tools"
+      aria-expanded="true"
+      aria-controls="toolbar"
+    >
+      <span class="tb-grip" aria-hidden="true"></span>
+    </button>
+
     <div class="colors" role="radiogroup" aria-label="Colour">
       <!-- The red is a crimson: warm orange-reds mix to mud with blue under
            pigment mixing, crimson gives a real purple (same reason paint

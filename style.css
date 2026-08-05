@@ -4,11 +4,17 @@
 --------------------------------------------------------------------------- */
 
 :root {
+  /* Gap between the toolbar and the bottom of the safe area. Named because the
+     stow distance is derived from it in JS — see "Stowing the toolbar". */
+  --tb-gap: 22px;
+
   --paper: #ffffff;
   --bg: #fafafa;
   --panel: rgba(255, 255, 255, 0.92);
   --menu-text: #333333;
   --track: #e2e2e2;
+  --grip: #cfcfcf;
+  --grip-active: #9a9a9a;
   --thumb-face: #ffffff;
   --thumb-ring: #bbbbbb;
   --ring: rgba(0, 0, 0, 0.14);
@@ -24,6 +30,8 @@ body.dark {
   --panel: rgba(34, 37, 42, 0.92);
   --menu-text: #ececec;
   --track: #3a3d43;
+  --grip: #565b62;
+  --grip-active: #8b9199;
   --thumb-face: #ececec;
   --thumb-ring: #6a6e75;
   --ring: rgba(255, 255, 255, 0.22);
@@ -146,20 +154,63 @@ body {
 .toolbar {
   position: fixed;
   left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 22px);
+  /* --tb-shift rides on top of the centring translate: JS slides the panel down
+     to stow it, so the layout position stays the "home" it snaps back to. */
+  transform: translateX(-50%) translateY(var(--tb-shift, 0px));
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--tb-gap));
   z-index: 10;
   width: min(86vw, 430px);
   display: flex;
   flex-direction: column;
   align-items: stretch;
   gap: 10px;
-  padding: 16px 24px 20px;
+  padding: 4px 24px 20px;
   background: var(--panel);
   border-radius: 32px;
   box-shadow: var(--shadow);
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
+  will-change: transform;
+}
+
+/* Only while snapping home or away — a dragging panel must track the finger
+   with no lag at all, and the class is dropped again on transitionend. */
+.toolbar.is-settling {
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* --- Toolbar grab-handle ------------------------------------------------ */
+
+/* Full panel width so it is hard to miss, and tall enough to stay a real touch
+   target once it is the only thing left on screen. */
+.tb-handle {
+  align-self: stretch;
+  height: 34px;
+  margin-bottom: -6px;
+  border: none;
+  background: transparent;
+  display: grid;
+  place-items: center;
+  cursor: grab;
+  touch-action: none;
+}
+
+.tb-grip {
+  width: 68px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--grip);
+  transition: background 0.16s ease;
+}
+
+/* Driven by a class, not :active — the press is preventDefault-ed by the
+   pointer router, which suppresses the native active state. */
+.toolbar.is-dragging {
+  cursor: grabbing;
+}
+
+.toolbar.is-dragging .tb-grip {
+  background: var(--grip-active);
 }
 
 /* Buttons: their own row, spanning the panel width. */

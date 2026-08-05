@@ -570,6 +570,137 @@
     syncSize();
   }
 
+  // --- Stowing the toolbar -----------------------------------------------
+
+  // The panel rides on a translateY stacked on the CSS that centres it, so its
+  // laid-out position stays the "home" it returns to. Drag the handle and the
+  // panel tracks your finger; let go and it settles to whichever end it is
+  // nearest — or, on a flick, whichever way you threw it. Stowed, it sits below
+  // the bottom edge with only the handle poking up.
+
+  const toolbar = document.getElementById("toolbar");
+  const handle = document.getElementById("tb-handle");
+  const colorsRow = document.querySelector(".colors");
+
+  const TAP_SLOP = 6; // a press that moves less than this is a tap, not a drag
+  const FLICK = 0.35; // px/ms — past this the throw decides, not the position
+  const FLICK_STALE = 120; // ms — a throw older than this is not a throw
+
+  let shift = 0; // current translateY, px
+  let stowed = false;
+
+  // What is left on screen when stowed: everything above the colours, which is
+  // the handle and its padding. Taking it from the row's own offset rather than
+  // a constant keeps the swatches exactly, and only just, off the bottom edge
+  // however the panel's spacing is restyled.
+  const peek = () => colorsRow.offsetTop;
+
+  // Sliding the panel by its own height plus its bottom gap would put its top
+  // edge exactly on the safe-area line, so stopping `peek` short of that leaves
+  // the handle showing above it. The inset cancels out of that sum, which is
+  // why it is nowhere in here.
+  function stowShift() {
+    const gap = parseFloat(
+      getComputedStyle(document.documentElement).getPropertyValue("--tb-gap")
+    );
+    return Math.max(0, toolbar.offsetHeight + (gap || 0) - peek());
+  }
+
+  function setShift(px, animate) {
+    shift = px;
+    toolbar.classList.toggle("is-settling", !!animate);
+    toolbar.style.setProperty("--tb-shift", px.toFixed(1) + "px");
+  }
+
+  function setStowed(on, animate) {
+    stowed = on;
+    setShift(on ? stowShift() : 0, animate);
+    handle.setAttribute("aria-label", on ? "Show tools" : "Hide tools");
+    handle.setAttribute("aria-expanded", String(!on));
+  }
+
+  // Where the panel actually is on screen right now. Mid-settle that is not
+  // `shift` (already set to the target), and grabbing it then must pick it up
+  // where it looks, not where it is heading.
+  function visualShift() {
+    if (!toolbar.classList.contains("is-settling")) return shift;
+    try {
+      return new DOMMatrixReadOnly(getComputedStyle(toolbar).transform).m42;
+    } catch (_) {
+      return shift;
+    }
+  }
+
+  // One drag at a time: a second finger landing on the handle would otherwise
+  // fight the first over the same translate. Asked of the live sessions rather
+  // than tracked in a flag of its own, so there is no second piece of state to
+  // fall out of step and wedge the handle if a press ever goes missing.
+  function dragActive() {
+    for (const s of sessions.values()) if (s.drag) return true;
+    return false;
+  }
+
+  function beginDrag(e) {
+    toolbar.classList.remove("is-settling");
+    toolbar.classList.add("is-dragging");
+    return {
+      from: visualShift(),
+      y0: e.clientY,
+      y: e.clientY,
+      t: e.timeStamp,
+      v: 0,
+      moved: 0,
+    };
+  }
+
+  function moveDrag(d, e) {
+    const dt = e.timeStamp - d.t;
+    if (dt > 0) d.v = (e.clientY - d.y) / dt;
+    d.y = e.clientY;
+    d.t = e.timeStamp;
+    const dy = e.clientY - d.y0;
+    if (Math.abs(dy) > d.moved) d.moved = Math.abs(dy);
+    setShift(Math.min(stowShift(), Math.max(0, d.from + dy)), false);
+  }
+
+  function endDrag(d) {
+    toolbar.classList.remove("is-dragging");
+    // Never really moved: that was a tap on the handle, so just toggle.
+    if (d.moved < TAP_SLOP) {
+      setStowed(!stowed, true);
+      return;
+    }
+    // A throw only counts if the finger was still moving as it left. Drag the
+    // panel somewhere, hold it there a moment and let go, and it settles from
+    // where you parked it rather than from where you were once heading — which
+    // is how a slow drag into position has to behave. Event timestamps share
+    // performance.now()'s clock, so this measures the pause before the lift.
+    const threw =
+      Math.abs(d.v) > FLICK && performance.now() - d.t < FLICK_STALE;
+    if (threw) setStowed(d.v > 0, true);
+    else setStowed(shift > stowShift() / 2, true);
+  }
+
+  // Leaving the class on would animate the next drag's first frame.
+  toolbar.addEventListener("transitionend", (e) => {
+    if (e.propertyName === "transform") toolbar.classList.remove("is-settling");
+  });
+
+  // Pointers are routed (see below), so the handle never sees a click of its
+  // own; this is the keyboard and assistive-tech path.
+  handle.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " " || e.key === "Spacebar") {
+      e.preventDefault();
+      setStowed(!stowed, true);
+    }
+  });
+
+  // A stowed panel is positioned from its own height and the viewport, both of
+  // which a rotation changes.
+  function reflowToolbar() {
+    if (stowed) setShift(stowShift(), false);
+  }
+
   // --- Pointer routing ---------------------------------------------------
 
   // One held press drives the whole app. Every pointer that goes down opens a
@@ -597,6 +728,7 @@
     const swatch = el.closest(".swatch");
     if (swatch) return { kind: "swatch", el: swatch };
     if (el.closest(".slider")) return { kind: "slider" };
+    if (el.closest(".tb-handle")) return { kind: "handle" };
     // Bare panel: no control here, but the paper behind it is covered.
     if (el.closest(".toolbar")) return { kind: "panel" };
     return { kind: "paper" };
@@ -604,6 +736,10 @@
 
   // Do whatever is under the pointer. Anything that isn't paper ends the stroke
   // first, so crossing the toolbar breaks the line instead of drawing under it.
+  // The handle is deliberately not in here: dragging the panel is a gesture
+  // owned by the press that started on it, not something a press picks up by
+  // wandering across — so a finger on its way somewhere else just breaks its
+  // stroke, exactly as the bare panel does.
   function act(e, hit) {
     if (hit.kind === "paper") {
       const s = strokes.get(e.pointerId);
@@ -620,8 +756,11 @@
   }
 
   function endSession(id, keep) {
-    if (!sessions.delete(id)) return;
-    if (keep) finishStroke(id);
+    const sess = sessions.get(id);
+    if (!sess) return;
+    sessions.delete(id);
+    if (sess.drag) endDrag(sess.drag); // settles the panel where it was let go
+    else if (keep) finishStroke(id);
     else dropStroke(id);
     try {
       canvas.releasePointerCapture(id);
@@ -642,20 +781,26 @@
       return;
     }
 
-    sessions.set(e.pointerId, { touch: e.pointerType === "touch" });
+    const sess = { touch: e.pointerType === "touch", drag: null };
+    sessions.set(e.pointerId, sess);
     // Capture keeps this press reporting to us wherever it travels, and takes it
-    // away from the range input so there is no native drag to fight.
+    // away from the range input so there is no native drag to fight. It is also
+    // what lets a handle drag carry on once the panel has slid out from under
+    // the finger that is moving it.
     try {
       canvas.setPointerCapture(e.pointerId);
     } catch (_) {}
-    act(e, hit);
+    if (hit.kind === "handle" && !dragActive()) sess.drag = beginDrag(e);
+    else act(e, hit);
     e.preventDefault();
   }
 
   function onPointerMove(e) {
     if (e.pointerType === "pen") lastPen = e.timeStamp; // hovering counts
-    if (!sessions.has(e.pointerId)) return;
-    act(e, hitTest(e.clientX, e.clientY));
+    const sess = sessions.get(e.pointerId);
+    if (!sess) return;
+    if (sess.drag) moveDrag(sess.drag, e);
+    else act(e, hitTest(e.clientX, e.clientY));
     e.preventDefault();
   }
 
@@ -845,7 +990,11 @@
     applyStyle(savedStyle === "paint" ? "paint" : "colour");
   }
 
-  window.addEventListener("resize", resize);
-  window.addEventListener("orientationchange", resize);
+  function relayout() {
+    resize();
+    reflowToolbar();
+  }
+  window.addEventListener("resize", relayout);
+  window.addEventListener("orientationchange", relayout);
   resize();
 })();
