@@ -81,6 +81,20 @@
         step="1"
         aria-label="Pen size"
       />
+      <!-- Paint amount has no track of its own: it is the slider's vertical
+           axis, shown by the fill inside the knob. This exists so the keyboard
+           and assistive tech can still reach it. Sixteen steps of 16 ending on
+           255, so any amount builds up to exactly full — see LAYER_ADD. -->
+      <input
+        id="amount"
+        class="a11y-only"
+        type="range"
+        min="15"
+        max="255"
+        value="207"
+        step="16"
+        aria-label="Paint amount"
+      />
     </div>
   </div>
 

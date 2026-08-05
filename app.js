@@ -64,6 +64,9 @@
   const tool = {
     color: "#e0356b",
     size: 24,
+    // Matches the paint-amount input's value in index.html, the way size does;
+    // syncAmount() at boot reconciles the two.
+    amount: 207,
     erasing: false,
     mixing: true,
   };
@@ -107,18 +110,30 @@
   const MIXR = MIXQ + 1; // cache-key radix; must track MIXQ or keys collide
   const mixCache = new Map();
 
-  // How much pigment a stroke lays down where it covers a pixel fully, out of
-  // 255. Below full means one pass leaves paper showing through, the way a thin
-  // wash does. This is the knob a "paint amount" control would drive.
-  const PAINT_AMOUNT = 208;
-  const PAINT_SCALE = PAINT_AMOUNT / 255;
-
-  // What each later layer adds. A first pass lands at PAINT_AMOUNT; passes over
-  // existing paint creep up by this much only, so 208 -> 224 -> 240 -> full is
-  // four passes instead of saturating on the second. Opacity only: the pigment
-  // mix still weights by the full amount laid, so two crossing strokes go
+  // What each later layer adds. A first pass lands at the stroke's paint amount;
+  // passes over existing paint creep up by this much only, so 207 -> 223 -> 239
+  // -> 255 is four passes instead of saturating on the second. Opacity only: the
+  // pigment mix still weights by the full amount laid, so two crossing strokes go
   // half-and-half however faint the paper under them still reads.
   const LAYER_ADD = 16;
+
+  // The paint amounts the slider can pick: whole LAYER_ADD steps down from full,
+  // so 255 - n * LAYER_ADD. Every one of them builds up to land exactly on 255,
+  // which is what picks 207 over a rounder 208 — 255 - 207 is 48, three whole
+  // steps. It is also 13/16 of full measured against 255, where 208 measures
+  // 13/16 of a 256th level alpha does not have. Sixteen levels; the faintest is
+  // 15 rather than 0, since a pen that leaves no mark reads as a fault.
+  const AMOUNT_STEP = LAYER_ADD;
+  const AMOUNT_MAX = 255;
+  const AMOUNT_LEVELS = 16;
+  const AMOUNT_MIN = AMOUNT_MAX - (AMOUNT_LEVELS - 1) * AMOUNT_STEP; // 15
+  const snapAmount = (v) =>
+    AMOUNT_MAX -
+    Math.min(
+      AMOUNT_LEVELS - 1,
+      Math.max(0, Math.round((AMOUNT_MAX - v) / AMOUNT_STEP))
+    ) *
+      AMOUNT_STEP;
 
   // Alpha at or below which a pixel counts as bare paper. What reads back from
   // a rim that faint is mostly premultiplied-alpha noise rather than a colour
@@ -230,13 +245,19 @@
     const img = snapCtx.getImageData(x, y, x2 - x, y2 - y);
     const px = img.data;
 
+    // The stroke's own paint amount, captured when it started. The mask is shared
+    // between concurrent strokes, so two fingers drawing at different amounts
+    // resolve per dirty region rather than per pixel — the same last-one-wins
+    // approximation the mask already makes where two strokes cross at once.
+    const scale = s.amount / AMOUNT_MAX;
+
     for (let i = 0; i < px.length; i += 4) {
       // Coverage scaled by the paint amount. Scaling here rather than by
       // drawing the mask at reduced alpha keeps a stroke even: the mask is
       // built from overlapping dabs, which would each composite again and
       // darken every overlap.
       const coverage = cov[i + 3] / 255;
-      const laid = coverage * PAINT_SCALE;
+      const laid = coverage * scale;
       if (laid === 0) continue;
       const had = px[i + 3] / 255; // paint that was already on the paper
 
@@ -499,6 +520,7 @@
       // the colour you drew it in.
       color: tool.color,
       size: tool.size,
+      amount: tool.amount,
       erasing: tool.erasing,
       mixing: canMix && tool.mixing && !tool.erasing,
     };
@@ -575,6 +597,7 @@
       tool.erasing = false;
       tool.color = btn.dataset.color;
     }
+    syncAmountUi(); // the knob's disc is in the colour, so it follows it
   }
 
   // Pointers are routed (see below), so this is only for keyboard and assistive
@@ -612,6 +635,65 @@
     if (v === Number(sizeInput.value)) return;
     sizeInput.value = v;
     syncSize();
+  }
+
+  // Paint amount is the slider's second axis: drag up for more paint, down for
+  // less, a step at a time. It has no track of its own — the wedge and the knob
+  // show where it stands, and the input below exists for the keyboard.
+  const amountInput = document.getElementById("amount");
+  const slider = document.querySelector(".slider");
+
+  // Two readouts of one number, both inheriting it from .slider: the wedge fills
+  // from the bottom like a meter, in a neutral, and the knob's disc previews the
+  // mark it will make — the colour at this amount, at the pen's size (see
+  // syncSize). Only the knob carries the colour; the meter is level alone.
+  function syncAmountUi() {
+    slider.style.setProperty("--amt", (tool.amount / AMOUNT_MAX).toFixed(3));
+    slider.style.setProperty(
+      "--ink-c",
+      tool.erasing ? "transparent" : tool.color
+    );
+  }
+
+  function syncAmount() {
+    tool.amount = snapAmount(Number(amountInput.value));
+    syncAmountUi();
+    try {
+      localStorage.setItem("colour-amount", String(tool.amount));
+    } catch (_) {}
+  }
+  amountInput.addEventListener("input", syncAmount);
+
+  function setAmount(v) {
+    const next = snapAmount(v);
+    if (next === tool.amount) return;
+    amountInput.value = next;
+    syncAmount();
+  }
+
+  // How far the pointer travels per step. The slider is 68px tall and there are
+  // sixteen levels, so one pass covers about five of them and the full range
+  // takes a few — which is the price of keeping the gesture inside the slider,
+  // where leaving it has to go on meaning what it already means.
+  const AMOUNT_PX = 12;
+
+  // Relative, not absolute: x already sets the size from wherever the pointer
+  // lands, and if y did the same every tap on the track would fling the paint
+  // amount to whatever height the finger happened to touch. So the first move
+  // only fixes a reference, and steps come from travel away from it. The
+  // remainder is carried rather than dropped, so climbing and descending cost
+  // exactly the same distance.
+  function nudgeAmount(e) {
+    const sess = sessions.get(e.pointerId);
+    if (!sess) return;
+    if (sess.ay == null) {
+      sess.ay = e.clientY;
+      return;
+    }
+    const steps = Math.trunc((sess.ay - e.clientY) / AMOUNT_PX); // up is more
+    if (!steps) return;
+    sess.ay -= steps * AMOUNT_PX;
+    setAmount(tool.amount + steps * AMOUNT_STEP);
   }
 
   // --- Stowing the toolbar -----------------------------------------------
@@ -785,6 +867,14 @@
   // wandering across — so a finger on its way somewhere else just breaks its
   // stroke, exactly as the bare panel does.
   function act(e, hit) {
+    // The vertical axis only counts while the pointer is on the slider. Anywhere
+    // else drops the reference point, so a press that wanders off to pick a
+    // colour and comes back starts stepping again from where it re-enters
+    // instead of jumping by however far it travelled in between.
+    if (hit.kind !== "slider") {
+      const sess = sessions.get(e.pointerId);
+      if (sess) sess.ay = null;
+    }
     if (hit.kind === "paper") {
       const s = strokes.get(e.pointerId);
       if (s) extendStroke(s, e);
@@ -796,7 +886,10 @@
     }
     finishStroke(e.pointerId);
     if (hit.kind === "swatch") selectSwatch(hit.el);
-    else if (hit.kind === "slider") setSizeFromPointer(e.clientX);
+    else if (hit.kind === "slider") {
+      setSizeFromPointer(e.clientX);
+      nudgeAmount(e);
+    }
   }
 
   function endSession(id, keep) {
@@ -1023,6 +1116,13 @@
     savedMixing = localStorage.getItem("colour-mixing") || "on";
   } catch (_) {}
   applyMixing(savedMixing !== "off");
+
+  let savedAmount = 0;
+  try {
+    savedAmount = Number(localStorage.getItem("colour-amount")) || 0;
+  } catch (_) {}
+  if (savedAmount) amountInput.value = snapAmount(savedAmount);
+  syncAmount(); // also paints the knob for the first time
 
   let savedStyle = "colour";
   try {

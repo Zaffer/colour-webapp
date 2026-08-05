@@ -281,6 +281,36 @@ body {
   pointer-events: none;
 }
 
+/* The wedge doubles as the paint-amount meter, filling from the bottom as the
+   amount rises. The parent's clip-path shapes this too, so the level reads
+   inside the wedge's silhouette rather than as a bar behind it — which is also
+   why the fill leans right: that is where the wedge has height to fill.
+   Deliberately a neutral rather than the paint colour: the knob beside it is
+   already the colour cue, and two of them made the panel shout. */
+.slider-wedge::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: calc(var(--amt, 0) * 100%);
+  background: var(--grip-active);
+}
+
+/* Reachable by keyboard and assistive tech, absent for everyone else — for a
+   control whose real interface is a gesture (see #amount in index.html). */
+.a11y-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* The visible knob. Its left is a % set from JS and it is centred on that
    point, so at min/max the centre sits right on the track's outer rim. */
 .slider-knob {
@@ -295,6 +325,18 @@ body {
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
   transform: translate(-50%, -50%);
   pointer-events: none;
+}
+
+/* The knob previews the mark: its diameter is the pen size, and this disc is the
+   colour at the current paint amount. Drag the slider up and down and the fill
+   is what tells you the amount changed — there is no second track to watch. */
+.slider-knob::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: 50%;
+  background: var(--ink-c, transparent);
+  opacity: var(--amt, 1);
 }
 
 .size {
