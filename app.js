@@ -637,11 +637,13 @@
     syncSize();
   }
 
-  // Paint amount is the slider's second axis: drag up for more paint, down for
-  // less, a step at a time. It has no track of its own — the wedge and the knob
-  // show where it stands, and the input below exists for the keyboard.
+  // Paint amount is the slider's second axis, read straight off the pointer's y
+  // the way size is read off its x: the top of the meter is full paint and the
+  // bottom is the least, so the level you drag to is the level you get. The
+  // input below exists for the keyboard.
   const amountInput = document.getElementById("amount");
   const slider = document.querySelector(".slider");
+  const wedge = document.querySelector(".slider-wedge");
 
   // Two readouts of one number, both inheriting it from .slider: the wedge fills
   // from the bottom like a meter, in a neutral, and the knob's disc previews the
@@ -671,29 +673,20 @@
     syncAmount();
   }
 
-  // How far the pointer travels per step. The slider is 68px tall and there are
-  // sixteen levels, so one pass covers about five of them and the full range
-  // takes a few — which is the price of keeping the gesture inside the slider,
-  // where leaving it has to go on meaning what it already means.
-  const AMOUNT_PX = 12;
-
-  // Relative, not absolute: x already sets the size from wherever the pointer
-  // lands, and if y did the same every tap on the track would fling the paint
-  // amount to whatever height the finger happened to touch. So the first move
-  // only fixes a reference, and steps come from travel away from it. The
-  // remainder is carried rather than dropped, so climbing and descending cost
-  // exactly the same distance.
-  function nudgeAmount(e) {
-    const sess = sessions.get(e.pointerId);
-    if (!sess) return;
-    if (sess.ay == null) {
-      sess.ay = e.clientY;
-      return;
-    }
-    const steps = Math.trunc((sess.ay - e.clientY) / AMOUNT_PX); // up is more
-    if (!steps) return;
-    sess.ay -= steps * AMOUNT_PX;
-    setAmount(tool.amount + steps * AMOUNT_STEP);
+  // Measured against the wedge rather than the whole slider, because the wedge is
+  // what the eye reads as the meter: put the finger level with its top rim and
+  // the paint is full, level with its bottom and it is the least. The slider is
+  // taller than the wedge by design — that margin keeps a big knob clear of the
+  // panel edge — so a pointer in it clamps to whichever end it is past.
+  //
+  // Sixteen levels across 48px is about 3px each, which is deliberately fine: the
+  // value snaps, so a wobble inside one band changes nothing, and setAmount is a
+  // no-op when the level has not actually moved.
+  function setAmountFromPointer(y) {
+    const r = wedge.getBoundingClientRect();
+    if (!r.height) return;
+    const t = Math.min(1, Math.max(0, (r.bottom - y) / r.height)); // up is more
+    setAmount(AMOUNT_MIN + t * (AMOUNT_MAX - AMOUNT_MIN));
   }
 
   // --- Stowing the toolbar -----------------------------------------------
@@ -867,14 +860,6 @@
   // wandering across — so a finger on its way somewhere else just breaks its
   // stroke, exactly as the bare panel does.
   function act(e, hit) {
-    // The vertical axis only counts while the pointer is on the slider. Anywhere
-    // else drops the reference point, so a press that wanders off to pick a
-    // colour and comes back starts stepping again from where it re-enters
-    // instead of jumping by however far it travelled in between.
-    if (hit.kind !== "slider") {
-      const sess = sessions.get(e.pointerId);
-      if (sess) sess.ay = null;
-    }
     if (hit.kind === "paper") {
       const s = strokes.get(e.pointerId);
       if (s) extendStroke(s, e);
@@ -887,8 +872,9 @@
     finishStroke(e.pointerId);
     if (hit.kind === "swatch") selectSwatch(hit.el);
     else if (hit.kind === "slider") {
+      // Both axes, both absolute: size from x, paint amount from y.
       setSizeFromPointer(e.clientX);
-      nudgeAmount(e);
+      setAmountFromPointer(e.clientY);
     }
   }
 
