@@ -103,8 +103,16 @@
 
   // Mixed-pixel cache: real drawings have few distinct colours under a brush,
   // so almost every pixel is a repeat.
-  const MIXQ = 63; // paint amounts quantised to 64 levels — invisible
+  const MIXQ = 255; // paint amounts quantised to 256 levels — the full alpha range
+  const MIXR = MIXQ + 1; // cache-key radix; must track MIXQ or keys collide
   const mixCache = new Map();
+
+  // How much pigment a stroke lays down where it covers a pixel fully, out of
+  // 255. Below full means one pass leaves paper showing through and a second
+  // pass builds the colour up, the way a thin wash does. This is the knob a
+  // "paint amount" control would drive; for now every stroke lays the same.
+  const PAINT_AMOUNT = 200;
+  const PAINT_SCALE = PAINT_AMOUNT / 255;
 
   function resetPigments() {
     pigments.clear();
@@ -210,7 +218,11 @@
     const px = img.data;
 
     for (let i = 0; i < px.length; i += 4) {
-      const laid = cov[i + 3] / 255; // paint the session has laid here
+      // Coverage scaled by the paint amount. Scaling here rather than by
+      // drawing the mask at reduced alpha keeps a stroke even: the mask is
+      // built from overlapping dabs, which would each composite again and
+      // darken every overlap.
+      const laid = (cov[i + 3] / 255) * PAINT_SCALE;
       if (laid === 0) continue;
       const had = px[i + 3] / 255; // paint that was already on the paper
 
@@ -225,12 +237,16 @@
       } else if (qLaid > 0) {
         const pk = (cov[i] << 16) | (cov[i + 1] << 8) | cov[i + 2];
         const pig = pigmentFor(pk, cov[i], cov[i + 1], cov[i + 2]);
+        // Packed as (pigment, colour, qHad, qLaid) in base MIXR. The pigment
+        // and colour fields together stay under 2^36, so with MIXR at 256 the
+        // key tops out just under 2^52 — inside the exact-integer range, with
+        // room to spare. MIXR above 362 would silently overflow it.
         const key =
           ((pig.i * 0x1000000 +
             ((px[i] << 16) | (px[i + 1] << 8) | px[i + 2])) *
-            64 +
+            MIXR +
             qHad) *
-            64 +
+            MIXR +
           qLaid;
         let out = mixCache.get(key);
         if (!out) {
