@@ -40,6 +40,21 @@
     </div>
   </div>
 
+  <!-- Mixing palette: the same card as the toolbar, parked directly behind it.
+       Lifting the toolbar by its handle slides it clear and reveals this. It is
+       a paint surface in its own right — daub two colours, scrub them together,
+       then lift the result off it with the eyedropper. -->
+  <div id="palette" class="palette" role="group" aria-label="Mixing palette">
+    <canvas id="palette-board" class="palette-board" aria-label="Mixing surface"></canvas>
+    <button
+      id="btn-pick"
+      class="swatch swatch--pick"
+      data-pick
+      aria-label="Pick a colour"
+      aria-pressed="false"
+    >💧</button>
+  </div>
+
   <!-- Tools: colours + eraser on top, pen size across the bottom. -->
   <div id="toolbar" class="toolbar">
     <!-- Grab-bar. Drag it down and the whole panel follows your finger, then

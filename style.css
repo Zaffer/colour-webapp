@@ -15,6 +15,9 @@
   --track: #e2e2e2;
   --grip: #cfcfcf;
   --grip-active: #9a9a9a;
+  /* The palette's own "paper" — a warm ceramic, so mixed paint reads as paint
+     rather than as ink on the same white the drawing sits on. */
+  --palette-face: #f3efe6;
   --thumb-face: #ffffff;
   --thumb-ring: #bbbbbb;
   --ring: rgba(0, 0, 0, 0.14);
@@ -32,6 +35,7 @@ body.dark {
   --track: #3a3d43;
   --grip: #565b62;
   --grip-active: #8b9199;
+  --palette-face: #24272c;
   --thumb-face: #ececec;
   --thumb-ring: #6a6e75;
   --ring: rgba(255, 255, 255, 0.22);
@@ -179,6 +183,52 @@ body {
   transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
+/* --- Mixing palette ----------------------------------------------------- */
+
+/* Same width and same resting place as the toolbar, one layer behind it, and
+   JS matches its height too — so at home it is exactly covered and lifting the
+   toolbar is the whole reveal. Its own translate only ever runs downwards, to
+   stay tucked under a stowing toolbar. */
+.palette {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%) translateY(var(--pl-shift, 0px));
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--tb-gap));
+  z-index: 9;
+  width: min(86vw, 430px);
+  background: var(--palette-face);
+  border-radius: 32px;
+  box-shadow: var(--shadow);
+  overflow: hidden; /* keeps paint inside the rounded card */
+  /* Hidden until lifted: the toolbar over it is only 92% opaque, so a palette
+     left at full strength behind it would show through as a smudge. */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.18s ease, background 0.2s ease;
+  will-change: transform;
+}
+
+.palette.is-revealed {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.palette.is-settling {
+  transition: transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.18s ease, background 0.2s ease;
+}
+
+/* Transparent, like the board: the card's background is the palette's face, so
+   a theme switch recolours it without touching the paint. */
+.palette-board {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
 /* --- Toolbar grab-handle ------------------------------------------------ */
 
 /* Full panel width so it is hard to miss, and tall enough to stay a real touch
@@ -258,6 +308,37 @@ body {
 
 .swatch--eraser.is-active {
   font-size: 34px;
+}
+
+/* The eyedropper, in the palette's top-right corner. Same swatch as the rest,
+   so it grows when it is the live tool; its face carries whatever colour was
+   last lifted, which is what makes it read as "your mixed colour". */
+.swatch--pick {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  background: var(--c, var(--palette-face));
+  box-shadow: inset 0 0 0 2px var(--ring);
+  font-size: 18px;
+  line-height: 1;
+  transition: width 0.16s ease, height 0.16s ease, border-color 0.16s ease,
+    font-size 0.16s ease;
+}
+
+.swatch--pick.is-active {
+  font-size: 30px;
+}
+
+/* Armed and waiting for you to touch a colour. */
+.swatch--pick.is-picking {
+  animation: pick-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes pick-pulse {
+  50% {
+    box-shadow: inset 0 0 0 2px var(--ring), 0 0 0 9px rgba(128, 128, 128, 0.2);
+  }
 }
 
 /* Pen-size slider: its own div, a little narrower than the buttons row and
