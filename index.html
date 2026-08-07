@@ -6,7 +6,7 @@
     name="viewport"
     content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
   />
-  <meta id="theme-color" name="theme-color" content="#fafafa" />
+  <meta id="theme-color" name="theme-color" content="#f5f1e9" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Colour</title>
@@ -52,7 +52,7 @@
       data-pick
       aria-label="Pick a colour"
       aria-pressed="false"
-    >💧</button>
+    >🎨</button>
   </div>
 
   <!-- Tools: colours + eraser on top, pen size across the bottom. -->
@@ -71,6 +71,13 @@
     </button>
 
     <div class="colors" role="radiogroup" aria-label="Colour">
+      <!-- The contrast pigment: whichever of black and white reads against the
+           paper, so it is black here and white in dark mode. applyTheme() swaps
+           its colour and label — the attributes below are only the light-mode
+           starting point, the way the size and amount inputs carry theirs. It
+           is a real pigment and mixes like one: black shades a colour, white
+           tints it, which is the pair the palette was missing. -->
+      <button class="swatch swatch--contrast" data-contrast data-color="#000000" style="--c:#000000" role="radio" aria-checked="false" aria-label="Black"></button>
       <!-- The red is a crimson: warm orange-reds mix to mud with blue under
            pigment mixing, crimson gives a real purple (same reason paint
            sets include crimson). -->

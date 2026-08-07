@@ -715,8 +715,26 @@
 
   const swatches = document.querySelectorAll(".swatch");
   const pickBtn = document.getElementById("btn-pick");
+  const contrastSwatch = document.querySelector("[data-contrast]");
   let activeSwatch = document.querySelector(".swatch.is-active");
   let picked = null; // the last colour lifted with the eyedropper
+
+  // The contrast pigment follows the paper: black to draw on a light one, white
+  // on a dark one. Only the tool changes — paint already down keeps the colour
+  // it was laid in, so black strokes made in light mode stay black when the
+  // lights go out, the same as every other colour on the page.
+  function applyContrast(dark) {
+    const c = dark ? "#ffffff" : "#000000";
+    contrastSwatch.dataset.color = c;
+    contrastSwatch.style.setProperty("--c", c);
+    contrastSwatch.setAttribute("aria-label", dark ? "White" : "Black");
+    // Holding it while the theme flips means painting with it, so the hand in
+    // mid-air gets the new colour rather than the one that just went invisible.
+    if (activeSwatch === contrastSwatch) {
+      tool.color = c;
+      syncAmountUi();
+    }
+  }
 
   // Idempotent: the router calls this on every move that is over a swatch, and
   // a drag sits over one swatch for many frames.
@@ -1347,7 +1365,9 @@
   function applyTheme(dark) {
     document.body.classList.toggle("dark", dark);
     darkBtn.textContent = dark ? "Light mode" : "Dark mode";
-    themeMeta.setAttribute("content", dark ? "#0e0f11" : "#fafafa");
+    applyContrast(dark);
+    // Literals, not read from the CSS: keep them in step with --bg by hand.
+    themeMeta.setAttribute("content", dark ? "#0e0f11" : "#f5f1e9");
     try {
       localStorage.setItem("colour-theme", dark ? "dark" : "light");
     } catch (_) {}

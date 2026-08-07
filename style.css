@@ -8,9 +8,15 @@
      stow distance is derived from it in JS — see "Stowing the toolbar". */
   --tb-gap: 22px;
 
-  --paper: #ffffff;
-  --bg: #fafafa;
-  --panel: rgba(255, 255, 255, 0.92);
+  /* Not pure white, for the same reason the dark paper is not pure black: an
+     unbroken extreme reads as a screen rather than as a surface. The lift is
+     much smaller than dark's — dark comes 22/255 off black to keep shadows
+     alive, while light only needs enough to take the glare off and let a white
+     pigment show against it. Warm rather than cool, because paper is warm and
+     this app is about paint. */
+  --paper: #fdfbf6;
+  --bg: #f5f1e9;
+  --panel: rgba(255, 253, 249, 0.92);
   --menu-text: #333333;
   --track: #e2e2e2;
   --grip: #cfcfcf;
@@ -18,7 +24,7 @@
   /* The palette's own "paper" — a warm ceramic, so mixed paint reads as paint
      rather than as ink on the same white the drawing sits on. */
   --palette-face: #f3efe6;
-  --thumb-face: #ffffff;
+  --thumb-face: #fffdf9;
   --thumb-ring: #bbbbbb;
   --ring: rgba(0, 0, 0, 0.14);
   --active-ring: rgba(0, 0, 0, 0.55);
@@ -60,12 +66,20 @@ body {
   width: 100%;
   height: 100%;
   overflow: hidden;
-  background: var(--bg);
   /* Kill every native touch gesture: scroll, pinch-zoom, double-tap-zoom. */
   touch-action: none;
   overscroll-behavior: none;
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   transition: background 0.2s ease;
+}
+
+/* Body alone, deliberately. The theme is a class on <body>, so an <html> asking
+   for var(--bg) is above it in the tree and only ever sees the light value —
+   which then paints every strip the board does not cover, in either theme. Left
+   without a background of its own, <html> hands the page background to <body>,
+   where the class actually applies. */
+body {
+  background: var(--bg);
 }
 
 #board {
@@ -295,6 +309,14 @@ body {
   width: 64px;
   height: 64px;
   border-color: var(--active-ring);
+}
+
+/* Black on a light panel, white on a dark one, so it always stands off the
+   panel by itself. The default swatch highlight is a white inner ring, which
+   would draw itself right across the black one — this uses the neutral ring
+   instead, which disappears into either. */
+.swatch--contrast {
+  box-shadow: inset 0 0 0 2px var(--ring);
 }
 
 .swatch--eraser {
